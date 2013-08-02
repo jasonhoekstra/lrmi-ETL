@@ -65,11 +65,12 @@ import sys
 import json
 import time
 import os
+import re
 
 
 
 class lrmi_ETL_extract:
-    def __init__(self, token):
+    def __init__(self, token = ""):
         if token != "":
             self.base_url = "https://node01.public.learningregistry.net/slice?any_tags=lrmi&resumption_token={0}"
             self.base_url_token = "https://node01.public.learningregistry.net/slice?any_tags=lrmi&resumption_token={0}"            
@@ -78,49 +79,85 @@ class lrmi_ETL_extract:
             self.base_url_token = "https://node01.public.learningregistry.net/slice?any_tags=lrmi&resumption_token={0}"
         self.token = token
         self.resumption_tokens = []
-        self.result_count = None
+        self.resultCount = None
+        self.resultCountOrig = None
         self.date = time.strftime("%m-%d-%Y")
         self.dir = None
+        self.extract_loop = 0
         
     def run(self):
         """This function manages the other functions."""
         self.setup()
+        print "Starting the extractoin process"
         url = self.build_url()
         filename = self.extract(url)
         self.resumption_token(filename)
-        self.result_count(filename)
-        self.divide(filename)
-        while self.result_count > 0:
+        self.result_count(filename, True)
+        self.divide(self.dir+".json")
+        while True:
             url = self.build_url()
             filename = self.extract(url)
+            self.result_count(filename)
+            if self.resultCount == 1:
+                break
+            self.divide(self.dir+".json")
             self.resumption_token(filename)
-            self.divide(filename)
-        report()
+            self.extract_loop = 0
+        self.report()
 
     def setup(self):
-        self.dir = os.getcwd()+ "\\{0} lmri_ETL"
+        print "Creating necessary files..."
+        self.dir = os.getcwd()+ "\\{0} lmri_ETL".format(str(self.date))
         os.mkdir(self.dir)
         os.chdir(self.dir)
-        os.mkdir("Docs")
+        os.mkdir("Documents")
         os.mkdir("Database")
         
     def extract(self, url):
         """This function will download the base JSON file.
         Arguments:
         url  --  type: string, description: the url the json file is at."""
-        try:
-            if os.path.exists(self.dir+".json"):
-                os.remove(self.dir+".json")
-            u.retrieve(url, self.dir+".json")
-            return self.dir+".json"
-        except:
-            raise Exception("Could not access the file at {0}".format(url))
+        while True:
+            try:
+                if os.path.exists(self.dir+".json"):
+                    os.remove(self.dir+".json")
+                u.URLopener().retrieve(url, self.dir+".json")
+                fi = open(self.dir+".json")
+                data = fi.read()
+                fi.close()
+                if "resultCount" not in data:
+                    time.sleep(2)
+                    if self.extract_loop ==10:
+                        raise e(error)
+                    self.extract_loop+=1
+                    continue
+                return self.dir+".json"
+            except IOError:
+                print "Bad Gateway - retrying"
+                time.sleep(2)
+                self.extract_loop +=1
+                if self.extract_loop ==10:
+                    raise Exception("Couldn't not access the JSON file")
         
         
     def divide(self, filename):
         """This function will divide each document(object with the 'doc_ID' string) from the original JSON file and place them into individual files by their doc_id.
 	Arguments:
 	filename  --  type: str, description: filename of the file you want to divide by doc_ID objects."""
+        f = open(filename)
+        try:
+            j = json.load(f)
+            if os.getcwd() != self.dir+"\\Documents":
+                os.chdir(self.dir+"\\Documents")
+            for  x in j['documents']:
+                fi = open(x['doc_ID'], "w")
+                fi.write(str(x))
+                fi.close()
+            f.close()
+        except ValueError:
+            raw_input("Couldn't parse file due to JSON errors")
+            exit(1)
+        
 
     def build_url(self):
         """This function will build the proper url based off of the resumption_token and baseurl."""
@@ -128,14 +165,17 @@ class lrmi_ETL_extract:
         self.base_url = self.base_url_token
         return url
 
-    def result_count(self, filename):
+    def result_count(self, filename, original=False):
         """This function retrieves the resultCount from the original JSON file.
         Arguments:
         filename  --  type: str, description: filename of the file from which you want to extract the result count"""
         f = open(filename, "r")
         j = json.load(f)
         f.close()
-        self.result_count = j['resultCount']
+        if original:
+            self.resultCountOrig = j['resultCount']
+        self.resultCount = j['resultCount']
+        return True
         
     def resumption_token(self, filename):
         """This function retrieves the resumption token from the original JSON files.
@@ -146,12 +186,21 @@ class lrmi_ETL_extract:
         j = json.load(f)
         f.close()
         self.token = j['resumption_token']
+        return True
         
     def report(self):
         """This function reports all the data that has been processed and writes the resumption token index."""
-        f = open("{0} resumption tokens.json".format(self.date), "w")
-        f.write('{"testdata":{0}}'.format(str(self.resumption_tokens)))
+        f = open("{0} resumption tokens.dat".format(self.date), "w")
+        f.write("\n".join(self.resumption_tokens))
         f.close()
-        print "Started at {0} and ended at {1}.\nDirectory: '{3}'\nInitial result count:{2}\nIndex of resumption tokens: '{0} resumption tokens.json'".format(self.date, time.strftime("%m/%d/%Y %I:%M"), self.result_count, self.dir)   
+        print "Started at {0} and ended at {1}.\nDirectory: '{3}'\nTotal files: {2}\nIndex of resumption tokens: '{0} resumption tokens.json'".format(self.date, time.strftime("%m/%d/%Y %I:%M"), self.resultCountOrig, self.dir)   
         raw_input("Press <Enter> to exit")
+        exit()
+
+if __name__ == "__main__":
+    if len(sys.argv) > 1:
+        e = lrmi_ETL_extract(str(sys.argv[1]))
+    else:
+        e = lrmi_ETL_extract("")
+    e.run()
         
