@@ -150,7 +150,7 @@ class lrmi_ETL_extract:
             if os.getcwd() != self.dir+"\\Documents":
                 os.chdir(self.dir+"\\Documents")
             for  x in j['documents']:
-                fi = open(x['doc_ID'], "w")
+                fi = open(str(x['doc_ID'])+.".json", "w")
                 fi.write(json.dumps(x))
                 fi.close()
             f.close()
