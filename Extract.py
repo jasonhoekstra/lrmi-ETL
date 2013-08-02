@@ -151,7 +151,7 @@ class lrmi_ETL_extract:
                 os.chdir(self.dir+"\\Documents")
             for  x in j['documents']:
                 fi = open(x['doc_ID'], "w")
-                fi.write(str(x))
+                fi.write(json.dumps(x))
                 fi.close()
             f.close()
         except ValueError:
