@@ -91,12 +91,15 @@ class lrmi_ETL_insert:
                             else:
                                 logging.warning(doc_id + " description not found")
 
+"""
                 if 'identity' in j['resource_data_description']:
                     print j['resource_data_description']['identity']['submitter']
                     if j['resource_data_description']['identity']['submitter'] == "inBloom Tagger Application <tagger@inbloom.org>":
                         print j['resource_data_description']['identity']
+"""
 
-
+            for key in j.keys()
+                print key
 
             ##print data
 
