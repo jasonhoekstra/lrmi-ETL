@@ -16,14 +16,12 @@ class lrmi_ETL_insert:
     def run(self):
         """Manages other functions"""
         os.chdir(self.dir)
-        ##files = os.listdir(os.getcwd())
         files = glob.glob(os.getcwd() + "/*.json")
 
         for fi in files:
             data = self.j_read(fi)
-            f_data = self.fields(data)
-            ## print f_data
-            ### self.insert(f_data)
+            resource = self.fields(data)
+            ##self.insert(resource)
 
     def j_read(self, fi):
         """Reads from the JSON files"""
@@ -37,6 +35,25 @@ class lrmi_ETL_insert:
             print ex.message
             pass
         return jdata
+
+
+    def print_keys(self, element):
+        if type(element) == dict:
+            for key in element.keys():
+                print key
+                self.print_keys(element[key])
+        elif type(element) == list:
+            for item in element:
+                self.print_keys(item)
+
+    def return_value(self, haystack, needle):
+        return_data = None
+        
+        if needle in haystack:
+            if type(haystack[needle]) == list and len(haystack[needle])>0:
+                return_data = haystack[needle][0]
+
+        return return_data
 
     def fields(self, j):
         """Extracts the fields from the JSON file"""
@@ -54,11 +71,13 @@ class lrmi_ETL_insert:
             "learningResourceType":"LEARNING_RESOURCE_ID",
             "dateCreated":"DATE_CREATED",
             "dateModified":"DATE_MODIFIED"}
-        data = {}
+        resource = {}
 
         try:
-            data['doc_ID'] = str(j['doc_ID'])
+            resource['doc_ID'] = str(j['doc_ID'])
             doc_id = str(j['doc_ID'])
+
+            #self.print_keys(j)
 
             if 'resource_data_description' in j:
                 if 'resource_data' in j['resource_data_description']:
@@ -67,39 +86,45 @@ class lrmi_ETL_insert:
                         if 'properties' in item:
                             properties = item['properties']
 
-                            if 'name' in properties:
-                                if type(properties['name']) == list and len(properties['name'])>0:
-                                    data['name'] = properties['name'][0]
-                                else:
-                                    logging.warning(doc_id + " name not found")
-                            else:
-                                logging.warning(doc_id + " name not found")
+                            resource['name'] = self.return_value(properties, 'name')
+                            if resource['name'] == None:
+                                resource['name'] = '(Unknown)'
+                            resource['url'] = self.return_value(properties, 'url')
+                            resource['description'] = self.return_value(properties, 'description')
+                            resource['inLanguage'] = self.return_value(properties, 'inLanguage')
+                            resource['dateCreated'] = self.return_value(properties, 'dateCreated')
+                            resource['dateModified'] = self.return_value(properties, 'dateModified')
+                            resource['datePublished'] = self.return_value(properties, 'datePublished')
+                            ##resource['thumbnailUrl'] = self.return_value(properties, 'thumbnailUrl')
+                            resource['publisher'] = self.return_value(properties, 'publisher')
+                            resource['about'] = self.return_value(properties, 'publisher')
+                            resource['useRightsUrl'] = self.return_value(properties, 'useRightsUrl')
+                            resource['isBasedOnUrl'] = self.return_value(properties, 'isBasedOnUrl')
 
-                            if 'url' in properties:
-                                if type(properties['url']) == list and len(properties['url'])>0:
-                                    data['url'] = properties['url'][0]
-                                else:
-                                    logging.warning(doc_id + " URL not found")
-                            else:
-                                logging.warning(doc_id + " URL not found")
 
-                            if 'description' in properties:
-                                if type(properties['description']) == list and len(properties['description'])>0:
-                                    data['description'] = properties['description'][0]
-                                else:
-                                    logging.warning(doc_id + " description not found")
-                            else:
-                                logging.warning(doc_id + " description not found")
+                            """useRightsUrl
+                            isBasedOnUrl
+                            learningResourceType
+                            interactivityType
+                            typicalAgeRange
+                            timeRequired
+                            educationalUse
+                            educationalAlignment
+                            educationalRole"""
 
-"""
+
+                            if resource['inLanguage'] != None:
+                                print json.dumps(resource, indent=2)
+
+
+                """
                 if 'identity' in j['resource_data_description']:
                     print j['resource_data_description']['identity']['submitter']
                     if j['resource_data_description']['identity']['submitter'] == "inBloom Tagger Application <tagger@inbloom.org>":
                         print j['resource_data_description']['identity']
-"""
+                """
 
-            for key in j.keys()
-                print key
+
 
             ##print data
 
@@ -114,11 +139,11 @@ class lrmi_ETL_insert:
         
 
         f_data = {}
-        for key in data:
-            f_data[temp[key]] = data[key]
+        #for key in resource:
+        #    f_data[temp[key]] = resource[key]
         return f_data
 
-    def insert(self, f_data):
+    def insert(self, resource):
         """Inserts the fields into their appropriate fields in the database"""
         update = False
         with self.mysql as m:
@@ -126,19 +151,19 @@ class lrmi_ETL_insert:
             rows = m.fetchall()
             for row in rows:
                 print row
-                if f_data['EXTERNAL_GUID'] in row:
+                if resource['EXTERNAL_GUID'] in row:
                     print "?"
                     update = True
             if update:
-                for key in f_data:
+                for key in resource:
                     if key != "EXTERNAL_GUID":
-                        m.execute("UPDATE resources SET %s = %s WHERE %s = %s", (key, f_data[key], 'EXTERNAL_GUID',  f_data['EXTERNAL_GUID']))
+                        m.execute("UPDATE resources SET %s = %s WHERE %s = %s", (key, resource[key], 'EXTERNAL_GUID',  resource['EXTERNAL_GUID']))
             else:
                 keys = []
                 values = []
-                for key in f_data.keys():
+                for key in resource.keys():
                     keys.append("'" + key + "', ")
-                for val in f_data.values():
+                for val in resource.values():
                     values.append("'" + val + "', ")
                 print keys
                 print values

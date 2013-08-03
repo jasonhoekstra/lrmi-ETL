@@ -1,9 +1,4 @@
 """
-For: Jason Hoekstra
-Made by: Justin Gardner
-Technical contact: Justin Gardner, j.rhynorater@gmail.com, (804)912-4148
-
-
 ***IMPORTANT***
 Each time the program is run, you MUST sumbit the initial resumption token by system argument.
 
@@ -107,11 +102,10 @@ class lrmi_ETL_extract:
 
     def setup(self):
         print "Creating necessary files..."
-        self.dir = os.getcwd()+ "\\{0} lmri_ETL".format(str(self.date))
+        self.dir = os.getcwd()+ "/lrmi_ETL/".format(str(self.date))
         os.mkdir(self.dir)
         os.chdir(self.dir)
         os.mkdir("Documents")
-        os.mkdir("Database")
         
     def extract(self, url):
         """This function will download the base JSON file.
@@ -147,11 +141,11 @@ class lrmi_ETL_extract:
         f = open(filename)
         try:
             j = json.load(f)
-            if os.getcwd() != self.dir+"\\Documents":
-                os.chdir(self.dir+"\\Documents")
+            if os.getcwd() != self.dir+"/Documents":
+                os.chdir(self.dir+"/Documents")
             for  x in j['documents']:
-                fi = open(str(x['doc_ID'])+.".json", "w")
-                fi.write(json.dumps(x))
+                fi = open(str(x['doc_ID'])+".json", "w")
+                fi.write(json.dumps(x, indent=2))
                 fi.close()
             f.close()
         except ValueError:
